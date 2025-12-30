@@ -13,17 +13,11 @@ The platform does mainly two things:
 * Able to convert user input to price action indictors like (moving average, fib retracement, rsi, e.g.)
 
 ### Non-functional
-* High performance and reliability
-* Scalable to screen 500+ stocks efficiently
-* Cloud-ready for automated execution
-
-
-## Strategy
-User can create a new strategy by adding a new md file under strategies folder.
-
+* stock screener runs every week, curates a list of good stocks. rank them so that only N (N=50, e.g.) stays in the list.
+* detector runs ondemand (cli), or live in a service.
 
 
 
 ## Entrypoint and Deployment
 1) **CLI Mode**: Run as a Python binary in the terminal (`orion run --strategy ofi`)
-2) **Cloud Mode**: Run as a cloud service (AWS Lambda with EventBridge scheduling)
+2) **Cloud Mode**: Run as a cloud service, use prefect to deploy the workflow.

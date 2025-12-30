@@ -1,44 +1,283 @@
 # Orion - Detailed System Design
 
 ## Overview
-Orion is a trading signals platform that identifies option trading opportunities based on configurable strategies, with initial focus on the OFI (Option for Income) strategy. Like its namesake, the legendary hunter of Greek mythology, Orion scans the market landscape to track down profitable trading opportunities.
+Orion is a trading signals platform that identifies option trading opportunities based on configurable strategies. Named after the legendary hunter of Greek mythology, Orion tracks down market opportunities with precision and efficiency.
+
+The platform consists of two main subsystems:
+1. **Screener**: Weekly curation of tradable stocks based on fundamentals (revenue, volume, liquidity)
+2. **Detector**: Real-time or on-demand detection of trading opportunities via technical analysis
 
 ## Architecture
 
 ### High-Level Components
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                          Orion System                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                               │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │   Strategy   │    │    Data      │    │  Notification │  │
-│  │   Engine     │───▶│   Provider   │◀───│   Service    │  │
-│  └──────────────┘    └──────────────┘    └──────────────┘  │
-│         │                    │                    │          │
-│         ▼                    ▼                    ▼          │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │  Screening   │    │    Cache     │    │   Alert      │  │
-│  │   Rules      │    │   Manager    │    │   Manager    │  │
-│  └──────────────┘    └──────────────┘    └──────────────┘  │
-│         │                                                    │
-│         ▼                                                    │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │              Results Storage & History                │  │
-│  └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-         │                      │                      │
-         ▼                      ▼                      ▼
-  ┌──────────┐          ┌──────────┐          ┌──────────┐
-  │   CLI    │          │   Cloud  │          │  Email   │
-  │ Interface│          │ Scheduler│          │  Service │
-  └──────────┘          └──────────┘          └──────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         Orion Platform                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │               SCREENER (Weekly Workflow)               │     │
+│  │  ┌──────────────┐    ┌──────────────┐    ┌─────────┐ │     │
+│  │  │  External    │───▶│   Ranking    │───▶│  Top N  │ │     │
+│  │  │  Screener    │    │   Engine     │    │ Stocks  │ │     │
+│  │  │  Service     │    │              │    │ (N=50)  │ │     │
+│  │  └──────────────┘    └──────────────┘    └─────────┘ │     │
+│  │         │                     │                 │      │     │
+│  │         └─────────────────────┴─────────────────┘      │     │
+│  │                            ▼                            │     │
+│  │                  ┌──────────────────┐                  │     │
+│  │                  │  Watchlist DB    │                  │     │
+│  │                  │  (Curated List)  │                  │     │
+│  │                  └──────────────────┘                  │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                              │                                    │
+│                              ▼                                    │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │             DETECTOR (On-Demand/Live Service)          │     │
+│  │  ┌──────────────┐    ┌──────────────┐    ┌─────────┐ │     │
+│  │  │  Technical   │    │    Pattern   │    │ Signal  │ │     │
+│  │  │  Indicators  │───▶│   Detection  │───▶│Generator│ │     │
+│  │  │  (SMA, RSI)  │    │   (HHHL)     │    │         │ │     │
+│  │  └──────────────┘    └──────────────┘    └─────────┘ │     │
+│  │         │                     │                 │      │     │
+│  │         └─────────────────────┴─────────────────┘      │     │
+│  │                            ▼                            │     │
+│  │                  ┌──────────────────┐                  │     │
+│  │                  │ Notification     │                  │     │
+│  │                  │ Service (Email)  │                  │     │
+│  │                  └──────────────────┘                  │     │
+│  └────────────────────────────────────────────────────────┘     │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────┐     │
+│  │                   Shared Services                      │     │
+│  │  ┌──────────────┐    ┌──────────────┐    ┌─────────┐ │     │
+│  │  │    Data      │    │    Cache     │    │ Results │ │     │
+│  │  │  Providers   │    │   Manager    │    │ Storage │ │     │
+│  │  └──────────────┘    └──────────────┘    └─────────┘ │     │
+│  └────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────┘
+           │                      │                      │
+           ▼                      ▼                      ▼
+    ┌──────────┐         ┌──────────────┐        ┌──────────┐
+    │   CLI    │         │   Prefect    │        │  Email   │
+    │  (Local) │         │ (Workflows)  │        │ Service  │
+    └──────────┘         └──────────────┘        └──────────┘
 ```
+
+## System Workflows
+
+### Screener Workflow (Weekly)
+**Schedule**: Runs every Sunday at 8 PM
+**Duration**: ~30-60 minutes
+**Purpose**: Curate a watchlist of top N stocks for trading
+
+**Steps**:
+1. **External Screener Query**: Query external screener service with fundamental criteria
+2. **Rank & Score**: Apply ranking algorithm to score stocks
+3. **Select Top N**: Keep only top 50 stocks
+4. **Update Watchlist**: Persist to database
+5. **Notify**: Send weekly summary email
+
+### Detector Workflow (On-Demand/Live)
+**Trigger**: CLI command or continuous service
+**Frequency**: On-demand or real-time monitoring
+**Purpose**: Detect trading opportunities in watchlist stocks
+
+**Steps**:
+1. **Load Watchlist**: Get current top N stocks from database
+2. **Fetch Market Data**: Get latest prices, option chains
+3. **Technical Analysis**: Calculate indicators (SMA, RSI, patterns)
+4. **Signal Generation**: Identify opportunities matching criteria
+5. **Alert**: Send email notifications for matches
 
 ## Core Components
 
-### 1. Strategy Engine
+### 1. External Screener Service Integration
+**Responsibility**: Query external stock screeners for fundamental filtering
+
+**Recommended Services**:
+- **Finviz** (Free tier available)
+  - Filters: Market cap, volume, revenue, industry
+  - Export: CSV/table scraping
+  - Limits: ~5000 stocks in universe
+
+- **Stock Rover** (API available)
+  - Advanced fundamental screening
+  - Custom metrics and ratios
+  - Paid tier required for API
+
+- **Yahoo Finance Screener** (Free)
+  - Basic fundamental filters
+  - Large stock universe
+  - Can scrape results
+
+- **Alpha Vantage Fundamentals API** (Free tier: 500 calls/day)
+  - Company overview, financials
+  - Programmatic access
+  - Need to build own filtering
+
+**Implementation**:
+```python
+class ExternalScreener(ABC):
+    @abstractmethod
+    async def screen(self, criteria: ScreeningCriteria) -> List[StockCandidate]:
+        """Query external screener with criteria"""
+
+@dataclass
+class ScreeningCriteria:
+    min_market_cap: float  # e.g., 1B
+    min_volume: int  # e.g., 1M shares/day
+    min_revenue: float  # e.g., 1B annually
+    max_results: int = 200
+    industries: List[str] = None
+
+@dataclass
+class StockCandidate:
+    symbol: str
+    company_name: str
+    market_cap: float
+    volume: int
+    revenue: float
+    score: float = 0.0  # Added by ranking engine
+```
+
+### 2. Ranking Engine
+**Responsibility**: Score and rank stock candidates to select top N
+
+**Ranking Criteria**:
+1. **Option Liquidity** (40% weight)
+   - Open interest > 500
+   - Bid-ask spread < 5%
+   - Multiple expirations available
+
+2. **Financial Health** (30% weight)
+   - Revenue growth YoY
+   - Positive free cash flow
+   - Debt-to-equity ratio
+
+3. **Volume & Liquidity** (20% weight)
+   - Average daily volume > 1M
+   - Consistent volume (low variance)
+
+4. **Technical Setup** (10% weight)
+   - Above 200-day SMA
+   - Not in downtrend
+
+**Implementation**:
+```python
+class RankingEngine:
+    def __init__(self, weights: Dict[str, float]):
+        self.weights = weights
+
+    async def rank_stocks(
+        self,
+        candidates: List[StockCandidate],
+        top_n: int = 50
+    ) -> List[RankedStock]:
+        """Score and rank stocks, return top N"""
+        scored = []
+        for candidate in candidates:
+            score = await self._calculate_score(candidate)
+            scored.append(RankedStock(
+                symbol=candidate.symbol,
+                score=score,
+                metrics=self._get_metrics(candidate)
+            ))
+
+        # Sort by score descending
+        ranked = sorted(scored, key=lambda x: x.score, reverse=True)
+        return ranked[:top_n]
+
+    async def _calculate_score(self, candidate: StockCandidate) -> float:
+        """Calculate weighted score"""
+        option_score = await self._score_option_liquidity(candidate.symbol)
+        financial_score = self._score_financials(candidate)
+        volume_score = self._score_volume(candidate)
+        technical_score = await self._score_technical(candidate.symbol)
+
+        total = (
+            option_score * self.weights['option_liquidity'] +
+            financial_score * self.weights['financial_health'] +
+            volume_score * self.weights['volume'] +
+            technical_score * self.weights['technical']
+        )
+        return total
+
+@dataclass
+class RankedStock:
+    symbol: str
+    score: float
+    rank: int = 0
+    metrics: Dict[str, Any] = None
+    added_date: date = None
+```
+
+### 3. Watchlist Database
+**Responsibility**: Store and manage curated stock list
+
+**Schema**:
+```sql
+-- Current watchlist (top N stocks)
+CREATE TABLE watchlist (
+    symbol TEXT PRIMARY KEY,
+    rank INTEGER NOT NULL,
+    score REAL NOT NULL,
+    added_date DATE NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    metrics JSON  -- Store ranking metrics
+);
+
+-- Historical watchlist for tracking
+CREATE TABLE watchlist_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    rank INTEGER,
+    score REAL,
+    week_start DATE NOT NULL,
+    week_end DATE,
+    UNIQUE(symbol, week_start)
+);
+
+-- Weekly screening runs
+CREATE TABLE screening_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total_candidates INTEGER,
+    top_n_selected INTEGER,
+    criteria JSON,
+    execution_time_ms INTEGER
+);
+```
+
+**Operations**:
+```python
+class WatchlistManager:
+    async def update_watchlist(
+        self,
+        ranked_stocks: List[RankedStock]
+    ):
+        """Replace watchlist with new top N stocks"""
+        # Archive old watchlist to history
+        await self._archive_current()
+
+        # Insert new watchlist
+        for i, stock in enumerate(ranked_stocks, 1):
+            stock.rank = i
+            await self._insert_stock(stock)
+
+    async def get_current_watchlist(self) -> List[RankedStock]:
+        """Get current top N stocks"""
+        return await self.db.query(
+            "SELECT * FROM watchlist ORDER BY rank"
+        )
+
+    async def get_watchlist_for_detection(self) -> List[str]:
+        """Get symbols for detector workflow"""
+        return [s.symbol for s in await self.get_current_watchlist()]
+```
+
+### 4. Strategy Engine
 **Responsibility**: Parse and execute trading strategies
 
 **Key Features**:
@@ -224,40 +463,191 @@ CREATE TABLE alerts_sent (
 
 ## Deployment Modes
 
-### Mode 1: CLI Terminal Execution
+### Mode 1: CLI Execution (On-Demand)
 ```bash
-# Run once
-orion run --strategy ofi
+# Run screener workflow manually
+orion screen --top-n 50
 
-# Run with custom stock list
-orion run --strategy ofi --symbols AAPL,MSFT,GOOGL
+# Run detector on current watchlist
+orion detect --strategy ofi
 
-# Scheduled execution (using cron)
-0 */2 * * * orion run --strategy ofi --notify email
+# Run detector on specific symbols
+orion detect --strategy ofi --symbols AAPL,MSFT
+
+# Get current watchlist
+orion watchlist --show
 ```
 
-### Mode 2: Cloud Service (AWS Lambda + EventBridge)
+### Mode 2: Prefect Workflows (Cloud/Scheduled)
+
+**Why Prefect?**
+- Modern workflow orchestration (better than Airflow/cron)
+- Built-in scheduling, retries, and error handling
+- Easy local development and cloud deployment
+- Excellent observability and monitoring
+- Free cloud tier available
+
 **Architecture**:
-- Lambda function for screener execution
-- EventBridge for scheduling (every 2 hours)
-- S3 for results storage
-- SES for email notifications
-- Secrets Manager for API keys
+```python
+# workflows/screener_flow.py
+from prefect import flow, task
+from prefect.deployments import Deployment
+from prefect.server.schemas.schedules import CronSchedule
 
-**Deployment**:
-```yaml
-# serverless.yml or SAM template
-functions:
-  screener:
-    handler: lambda_handler.run_screener
-    timeout: 300  # 5 minutes
-    memory: 512
-    events:
-      - schedule: rate(2 hours)
-    environment:
-      STRATEGY: ofi
-      NOTIFICATION_EMAIL: ${env:EMAIL}
+@task(retries=3, retry_delay_seconds=60)
+async def query_external_screener():
+    """Query Finviz/Yahoo for stock candidates"""
+    screener = FinvizScreener()
+    return await screener.screen(criteria)
+
+@task
+async def rank_and_select_top_n(candidates, n=50):
+    """Rank candidates and select top N"""
+    ranker = RankingEngine(weights)
+    return await ranker.rank_stocks(candidates, top_n=n)
+
+@task
+async def update_watchlist(ranked_stocks):
+    """Persist top N to database"""
+    manager = WatchlistManager()
+    await manager.update_watchlist(ranked_stocks)
+
+@task
+async def send_weekly_summary(watchlist):
+    """Email weekly watchlist summary"""
+    notifier = NotificationService()
+    await notifier.send_watchlist_summary(watchlist)
+
+@flow(name="Weekly Screener")
+async def screener_workflow(top_n: int = 50):
+    """Weekly screener workflow"""
+    logger.info("Starting weekly screener workflow")
+
+    # Step 1: Query external screener
+    candidates = await query_external_screener()
+    logger.info(f"Found {len(candidates)} candidates")
+
+    # Step 2: Rank and select top N
+    ranked = await rank_and_select_top_n(candidates, n=top_n)
+    logger.info(f"Selected top {len(ranked)} stocks")
+
+    # Step 3: Update watchlist
+    await update_watchlist(ranked)
+
+    # Step 4: Send summary
+    await send_weekly_summary(ranked)
+
+    return ranked
+
+# Deployment configuration
+deployment = Deployment.build_from_flow(
+    flow=screener_workflow,
+    name="weekly-screener",
+    schedule=CronSchedule(cron="0 20 * * 0"),  # Sunday 8 PM
+    work_queue_name="orion-queue",
+    parameters={"top_n": 50}
+)
 ```
+
+**Detector Flow**:
+```python
+# workflows/detector_flow.py
+@task(retries=2)
+async def load_watchlist():
+    """Load current watchlist from DB"""
+    manager = WatchlistManager()
+    return await manager.get_watchlist_for_detection()
+
+@task
+async def fetch_market_data(symbols):
+    """Fetch latest prices and option chains"""
+    provider = AlphaVantageProvider()
+    return await provider.batch_get_quotes(symbols)
+
+@task
+async def detect_signals(market_data, strategy):
+    """Run technical analysis and detect signals"""
+    detector = SignalDetector(strategy)
+    return await detector.scan_for_signals(market_data)
+
+@task
+async def send_alerts(signals):
+    """Send email alerts for detected opportunities"""
+    notifier = NotificationService()
+    for signal in signals:
+        await notifier.send_signal_alert(signal)
+
+@flow(name="Signal Detector")
+async def detector_workflow(strategy_name: str = "ofi"):
+    """On-demand or live signal detection"""
+    logger.info(f"Running detector with strategy: {strategy_name}")
+
+    # Load strategy and watchlist
+    strategy = load_strategy(strategy_name)
+    symbols = await load_watchlist()
+
+    # Fetch market data
+    market_data = await fetch_market_data(symbols)
+
+    # Detect signals
+    signals = await detect_signals(market_data, strategy)
+    logger.info(f"Detected {len(signals)} signals")
+
+    # Send alerts
+    if signals:
+        await send_alerts(signals)
+
+    return signals
+
+# Can run on-demand via CLI or schedule
+# For live monitoring: schedule every 15 minutes during market hours
+detector_deployment = Deployment.build_from_flow(
+    flow=detector_workflow,
+    name="live-detector",
+    schedule=CronSchedule(
+        cron="*/15 9-16 * * 1-5",  # Every 15 min, 9am-4pm, Mon-Fri
+        timezone="America/New_York"
+    ),
+    work_queue_name="orion-queue",
+    parameters={"strategy_name": "ofi"}
+)
+```
+
+**Local Development**:
+```bash
+# Start Prefect server locally
+prefect server start
+
+# Deploy flows
+python workflows/screener_flow.py
+python workflows/detector_flow.py
+
+# Run manually
+prefect deployment run 'Weekly Screener/weekly-screener'
+prefect deployment run 'Signal Detector/live-detector'
+```
+
+**Cloud Deployment** (Prefect Cloud):
+```bash
+# Login to Prefect Cloud (free tier)
+prefect cloud login
+
+# Create work pool
+prefect work-pool create orion-pool --type process
+
+# Deploy workflows
+prefect deploy workflows/screener_flow.py:screener_workflow
+prefect deploy workflows/detector_flow.py:detector_workflow
+
+# Start worker (can run on any server/container)
+prefect worker start --pool orion-pool
+```
+
+**Alternative: Self-Hosted on VPS**:
+- Run Prefect server on DigitalOcean droplet ($6/month)
+- SQLite for Prefect metadata
+- PostgreSQL for Orion data
+- Systemd for worker process management
 
 ## Configuration Management
 
