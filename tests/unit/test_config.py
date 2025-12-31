@@ -1,15 +1,11 @@
 """
 Tests for configuration management.
 """
-import json
-import os
+
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 import pytest
 import yaml
-from pydantic import ValidationError
-
 from orion.config import (
     CacheConfig,
     Config,
@@ -20,6 +16,7 @@ from orion.config import (
     load_config,
     load_config_from_yaml,
 )
+from pydantic import ValidationError
 
 
 class TestDataProviderConfig:

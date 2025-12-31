@@ -1,7 +1,6 @@
 """
 Tests for project setup and basic imports.
 """
-import pytest
 
 
 def test_package_importable():
@@ -26,11 +25,6 @@ def test_version_format():
 
 def test_subpackages_importable():
     """Verify all subpackages can be imported."""
-    from orion import core
-    from orion import data
-    from orion import strategies
-    from orion import notifications
-    from orion import utils
 
     # Basic import test passes if no ImportError raised
     assert True

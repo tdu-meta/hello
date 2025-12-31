@@ -4,6 +4,7 @@ Structured logging setup for Orion using structlog.
 This module provides JSON-formatted structured logging with context support
 for better observability and debugging.
 """
+
 import logging
 import sys
 from typing import Any
@@ -12,9 +13,7 @@ import structlog
 from structlog.typing import EventDict, WrappedLogger
 
 
-def add_app_context(
-    logger: WrappedLogger, method_name: str, event_dict: EventDict
-) -> EventDict:
+def add_app_context(logger: WrappedLogger, method_name: str, event_dict: EventDict) -> EventDict:
     """
     Add application context to log events.
 
@@ -52,7 +51,7 @@ def setup_logging(level: str = "INFO", format_type: str = "json") -> None:
 
     # Choose processors based on format type
     if format_type == "json":
-        renderer = structlog.processors.JSONRenderer()
+        renderer: Any = structlog.processors.JSONRenderer()
     else:
         renderer = structlog.dev.ConsoleRenderer()
 
@@ -74,7 +73,7 @@ def setup_logging(level: str = "INFO", format_type: str = "json") -> None:
     )
 
 
-def get_logger(name: str | None = None, **initial_values: Any) -> structlog.BoundLogger:
+def get_logger(name: str | None = None, **initial_values: Any) -> Any:  # type: ignore[misc]
     """
     Get a configured logger instance.
 

@@ -4,6 +4,7 @@ Configuration management for Orion using Pydantic Settings.
 This module provides type-safe configuration loading from environment variables
 and YAML files with validation.
 """
+
 from pathlib import Path
 from typing import Any
 
@@ -52,8 +53,9 @@ class NotificationConfig(BaseSettings):
         if isinstance(v, str):
             import json
 
-            return json.loads(v)
-        return v
+            result: list[str] = json.loads(v)
+            return result
+        return list(v) if v else []
 
 
 class ScreeningConfig(BaseSettings):
@@ -74,8 +76,9 @@ class ScreeningConfig(BaseSettings):
         if isinstance(v, str):
             import json
 
-            return json.loads(v)
-        return v
+            result: list[str] = json.loads(v)
+            return result
+        return list(v) if v else []
 
 
 class LoggingConfig(BaseSettings):
@@ -91,11 +94,11 @@ class LoggingConfig(BaseSettings):
 class Config(BaseSettings):
     """Main configuration class that combines all sub-configurations."""
 
-    data_provider: DataProviderConfig = Field(default_factory=DataProviderConfig)
-    cache: CacheConfig = Field(default_factory=CacheConfig)
-    notifications: NotificationConfig = Field(default_factory=NotificationConfig)
-    screening: ScreeningConfig = Field(default_factory=ScreeningConfig)
-    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    data_provider: DataProviderConfig = Field(default_factory=DataProviderConfig)  # type: ignore[arg-type]
+    cache: CacheConfig = Field(default_factory=CacheConfig)  # type: ignore[arg-type]
+    notifications: NotificationConfig = Field(default_factory=NotificationConfig)  # type: ignore[arg-type]
+    screening: ScreeningConfig = Field(default_factory=ScreeningConfig)  # type: ignore[arg-type]
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)  # type: ignore[arg-type]
 
     model_config = SettingsConfigDict(env_file=".env", env_nested_delimiter="__", extra="ignore")
 
@@ -114,7 +117,7 @@ def load_config(env_file: str | None = None) -> Config:
         ValidationError: If configuration is invalid
     """
     if env_file:
-        return Config(_env_file=env_file)
+        return Config(_env_file=env_file)  # type: ignore[call-arg]
     return Config()
 
 

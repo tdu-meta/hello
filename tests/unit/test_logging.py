@@ -1,12 +1,10 @@
 """
 Tests for logging infrastructure.
 """
+
 import json
-import logging
 
-import pytest
 import structlog
-
 from orion.utils.logging import get_logger, setup_logging
 
 
