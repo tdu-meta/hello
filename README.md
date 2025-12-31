@@ -137,7 +137,7 @@ orion/
 
 ## 🔧 Technology Stack
 
-- **Language**: Python 3.11+
+- **Language**: Python 3.12+
 - **Async Framework**: asyncio + aiohttp
 - **Data Sources**: Alpha Vantage, Yahoo Finance
 - **Technical Analysis**: pandas, numpy, pandas-ta
@@ -174,7 +174,7 @@ make ci
 
 Tests are automatically triggered on every push and pull request via GitHub Actions:
 
-- ✅ **Unit Tests**: Run on Python 3.11 and 3.12
+- ✅ **Unit Tests**: Run on Python 3.12
 - ✅ **Code Coverage**: Tracked with pytest-cov
 - ✅ **Linting**: Black, Ruff
 - ✅ **Type Checking**: mypy
