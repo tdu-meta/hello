@@ -26,6 +26,8 @@ class DataProviderConfig(BaseSettings):
 class CacheConfig(BaseSettings):
     """Configuration for caching strategy."""
 
+    enabled: bool = Field(default=True, description="Enable caching")
+    max_size: int = Field(default=1000, description="Maximum cache size")
     quote_ttl: int = Field(default=300, description="Quote cache TTL in seconds")
     option_chain_ttl: int = Field(default=900, description="Option chain cache TTL in seconds")
     historical_ttl: int = Field(default=86400, description="Historical data cache TTL in seconds")

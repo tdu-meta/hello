@@ -32,6 +32,7 @@ pytest-cov = "^4.1"
 black = "^23.12"
 ruff = "^0.1"
 mypy = "^1.8"
+types-pyyaml = "^6.0.12.20250915"
 
 [tool.poetry.scripts]
 orion = "orion.cli:cli"

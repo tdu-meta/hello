@@ -38,7 +38,7 @@ repos:
     hooks:
       - id: pytest-check
         name: pytest-check
-        entry: bash -c 'cd /Users/tingfangdu/Code/projects/hello && make test'
+        entry: bash -c 'poetry run pytest tests/unit/ -v'
         language: system
         pass_filenames: false
         always_run: true
