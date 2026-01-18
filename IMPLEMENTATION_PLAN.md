@@ -15,7 +15,7 @@ Trading signals platform for identifying Option for Income (OFI) opportunities. 
 | 4 | Strategy Engine | ✅ COMPLETE | Parser, evaluator, option analyzer working |
 | 5 | Screening Orchestration | ✅ COMPLETE | Core screener + notifications |
 | 6 | CLI & Storage | ✅ COMPLETE | CLI + SQLite with aiosqlite |
-| 7 | Cloud Deployment | ❌ TODO | AWS Lambda |
+| 7 | Cloud Deployment | ✅ COMPLETE | AWS Lambda + CDK infrastructure |
 
 ---
 
@@ -174,18 +174,94 @@ Phase 6 has been successfully implemented with all required components passing t
 
 ---
 
-## Phase 7: Cloud Deployment (TODO)
+## Phase 7: Cloud Deployment (COMPLETE)
 
-### Files to Create
-- `src/orion/lambda_handler.py`
-- `infrastructure/cdk_app.py`
-- `deploy.sh`
+### Summary
+Phase 7 has been successfully implemented with all required components passing tests. The cloud deployment enables automated stock screening via AWS Lambda with EventBridge scheduling and CloudWatch monitoring.
 
-### Requirements (from specs/cloud-deployment.md)
-- Lambda handler with < 15 min timeout
-- EventBridge scheduling
-- CloudWatch monitoring
-- CDK/SAM infrastructure
+### Files Created
+- `src/orion/lambda_handler.py` - Lambda entry point with event parsing and screening orchestration
+- `infrastructure/cdk_app.py` - CDK application for stack deployment
+- `infrastructure/lib/orion_stack.py` - CDK stack with Lambda, EventBridge, CloudWatch resources
+- `infrastructure/cdk.json` - CDK configuration
+- `deploy.sh` - Deployment script with prerequisite checks
+- `tests/unit/test_lambda_handler.py` - Tests for Lambda handler (18 tests)
+
+### Key Features Implemented
+1. **Lambda Handler:**
+   - `handler(event, context)` - Lambda entry point ✅
+   - Event schema parsing (strategy, symbols, notify, dry_run) ✅
+   - Strategy file resolution (supports Lambda /opt and local paths) ✅
+   - Config loading from environment variables ✅
+   - Async screening execution with timeout handling ✅
+   - JSON-serializable response format ✅
+   - Structured CloudWatch logging ✅
+   - Local testing support via `python -m orion.lambda_handler` ✅
+
+2. **Infrastructure as Code (CDK):**
+   - Lambda function with Python 3.12 runtime ✅
+   - Lambda timeout: 15 minutes (maximum) ✅
+   - Lambda memory: 1024 MB (configurable) ✅
+   - CloudWatch Log Group with 1-week retention ✅
+   - EventBridge rule for scheduled execution ✅
+   - IAM role with minimal permissions (CloudWatch Logs only) ✅
+   - CloudWatch Alarms (error rate, duration) ✅
+   - Environment variable configuration ✅
+
+3. **Deployment Script:**
+   - Prerequisite checks (Python, Node.js, CDK, Docker) ✅
+   - AWS credential validation ✅
+   - CDK bootstrap if needed ✅
+   - Environment variable passthrough for secrets ✅
+   - Support for custom AWS profiles and regions ✅
+   - Deployment output with Lambda invoke and log viewing commands ✅
+
+4. **Environment Configuration:**
+   - `DATA_PROVIDER__provider` - yahoo_finance or alpha_vantage ✅
+   - `DATA_PROVIDER__api_key` - Alpha Vantage API key ✅
+   - `NOTIFICATIONS__*` - SMTP configuration for alerts ✅
+   - `DEFAULT_SYMBOLS` - Symbols for scheduled runs ✅
+   - `SCHEDULE_EXPRESSION` - EventBridge cron/rate expression ✅
+   - `SCHEDULE_ENABLED` - Enable/disable scheduling ✅
+
+### Dependencies Added
+- aws-cdk-lib ^2.100 - AWS CDK library
+- constructs ^10.3 - CDK constructs base
+
+### Tests
+- All 18 tests passing for Lambda handler
+- Total: 211 unit tests passing (193 + 18 new)
+
+### Deployment Instructions
+```bash
+# Set environment variables
+export ALPHA_VANTAGE_API_KEY="your_key"
+export SMTP_HOST="smtp.example.com"
+export SMTP_PORT="587"
+export SMTP_USER="user"
+export SMTP_PASSWORD="password"
+export NOTIFICATION_FROM="alerts@example.com"
+export NOTIFICATION_TO='["recipient@example.com"]'
+
+# Deploy to AWS
+./deploy.sh
+
+# Or with custom options
+./deploy.sh --profile prod --region us-west-2 --schedule "rate(4 hours)"
+```
+
+### Manual Lambda Invocation
+```bash
+aws lambda invoke \
+  --function-name orion-screening \
+  --payload '{"strategy":"ofi","symbols":["AAPL"],"notify":false}' \
+  response.json
+```
+
+### View CloudWatch Logs
+```bash
+aws logs tail /aws/lambda/orion-screening --follow
+```
 
 ---
 
@@ -227,4 +303,4 @@ poetry run pytest --cov=src/orion --cov-report=html
 
 ## Git Tags
 
-*None yet - will create after first verified working implementation*
+- `v0.0.1` - All 7 phases complete, 211 tests passing
