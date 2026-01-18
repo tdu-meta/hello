@@ -1,0 +1,69 @@
+# OFI (Option for Income) Strategy
+# A strategy that identifies opportunities to sell ATM puts on large companies
+# that are in bullish trends but experiencing temporary oversold conditions.
+
+name: "OFI - Option for Income"
+version: "1.0.0"
+description: |
+  The Option for Income (OFI) strategy identifies opportunities to sell at-the-money
+  put options on large, stable companies that are in bullish trends but experiencing
+  temporary oversold conditions and bounce patterns.
+
+  Entry Criteria:
+  1. Large companies with >$1B annual revenue
+  2. Bullish trend (20 SMA > 60 SMA)
+  3. Recent oversold condition (RSI < 30 within last 5 days)
+  4. Bounce pattern confirmation (higher high + higher low with volume)
+
+tags:
+  - income
+  - puts
+  - trend-following
+
+stock_criteria:
+  min_revenue: 1000000000  # $1 billion minimum annual revenue
+  min_market_cap: 500000000  # $500M minimum market cap
+  min_price: 10.0  # Minimum stock price
+  exchanges: []  # No exchange filter
+
+entry_conditions:
+  - type: trend
+    rule: sma_20 > sma_60
+    description: "Bullish trend: 20-period SMA above 60-period SMA"
+    weight: 1.0
+    parameters: {}
+
+  - type: oversold
+    rule: rsi_was_below
+    description: "Recent oversold condition: RSI was below 30 within lookback period"
+    weight: 1.0
+    parameters:
+      threshold: 30.0
+      lookback_days: 5
+
+  - type: bounce
+    rule: higher_high_higher_low
+    description: "Bounce pattern: Higher high and higher low with volume confirmation"
+    weight: 1.0
+    parameters:
+      lookback: 5
+      volume_confirmation: true
+      volume_threshold: 1.2
+
+option_screening:
+  # Minimum 2% annualized premium yield
+  min_premium_yield: 0.02
+
+  # Target options 30 days out
+  target_dte: 30
+
+  # Accept options between 7-60 days to expiration
+  min_dte: 7
+  max_dte: 60
+
+  # ATM tolerance: 5% above/below current price
+  tolerance: 0.05
+
+  # Minimum liquidity thresholds
+  min_volume: 100
+  min_open_interest: 500
